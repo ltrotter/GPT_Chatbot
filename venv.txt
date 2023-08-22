@@ -1,0 +1,8 @@
+# create a new python venv for GPT-4
+# python -m venv gpt
+
+## PS
+# .\gpt\scripts\activate
+
+## bash
+# source gpt/Scripts/activate
