@@ -5,6 +5,7 @@ import openai
 import time
 import tiktoken
 import sys
+import colorama
 
 # set API keys
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -13,6 +14,11 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 convo_path = "conversations"
 if not os.path.exists(convo_path):
     os.makedirs(convo_path)
+
+# set the colors for the conversation
+colorama.init()
+mc = 36 # message color
+wc = 33 # warning color
 
 # ~~~~~~~~~~~~~~~~~~~~~~~ CLASSES ~~~~~~~~~~~~~~~~~~~~~~~#
 class Conversation:
@@ -76,25 +82,6 @@ class Conversation:
 
         return response_text
 
-    def converse(self):
-        """Start a conversation with the GPT engine."""
-        # start a conversation
-        while True:
-
-            print(self.token_count)
-
-            # get the user's message
-            user_msg = input("User: ")
-
-            # add the user's message to the conversation
-            self.messages.append({"role": "user", "content": user_msg})
-
-            # get the response from the GPT engine
-            response = self.stream_response()
-
-            # add the response to the conversation
-            self.messages.append({"role": "system", "content": response})
-
 # ~~~~~~~~~~~~~~~~~~~~~~~ FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~#
 def get_time(type = "text"):
     '''Get the current time in the format "dd/mm/yyyy hh:mm:ss" for text or "yyyymmdd_hhmmss" for file names.'''
@@ -104,6 +91,10 @@ def get_time(type = "text"):
         return time.strftime("%Y%m%d_%H%M%S", time.localtime())
     else:
         raise ValueError("type must be either 'text' or 'file'")
+
+def colf(message, color):
+    """Formats a message in the message color."""
+    return('\033[' + str(color) + 'm' + message + '\033[0m')
 
 # ~~~~~~~~~~~~~~~~~~~~~~~ MAIN ~~~~~~~~~~~~~~~~~~~~~~~#
 def main():
@@ -115,7 +106,21 @@ def main():
     C = Conversation(system_msg)
 
     try:
-        C.converse()
+        print(colf(f"Conversation started at {get_time()}", mc))
+
+        # loop until the conversation is over
+        while True:
+            # Ask for a message and add it to the conversation
+            message = input(colf("You: ", mc))
+            C.messages.append({"role": "user", "content": message})
+
+            # stream the response
+            print(colf("Bot: ", mc), end='')
+            response = C.stream_response()
+
+            if not C.continuing:
+                break
+
     except Exception as e:
         print(e)
 
