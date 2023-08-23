@@ -6,6 +6,7 @@ import time
 import tiktoken
 import sys
 import colorama
+import pyperclip
 
 # set API keys
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -18,6 +19,7 @@ if not os.path.exists(convo_path):
 # set the colors for the conversation
 colorama.init()
 mc = 36 # message color
+sc = 35 # system color
 wc = 33 # warning color
 
 # ~~~~~~~~~~~~~~~~~~~~~~~ CLASSES ~~~~~~~~~~~~~~~~~~~~~~~#
@@ -74,6 +76,7 @@ class Conversation:
             if content is not None:
                  response_text += content
                  print(content, flush=True, end='')
+        print('\n')
 
         # update token count
         enc = tiktoken.encoding_for_model(self.model)
@@ -81,7 +84,7 @@ class Conversation:
         self.token_count += len(enc.encode(self.messages[-1]["content"]))
 
         return response_text
-
+    
 # ~~~~~~~~~~~~~~~~~~~~~~~ FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~#
 def get_time(type = "text"):
     '''Get the current time in the format "dd/mm/yyyy hh:mm:ss" for text or "yyyymmdd_hhmmss" for file names.'''
@@ -96,40 +99,58 @@ def colf(message, color):
     """Formats a message in the message color."""
     return('\033[' + str(color) + 'm' + message + '\033[0m')
 
+def get_prompt(whom = "You", col = mc):
+    """Get the next user prompt for the conversation."""
+    message = input(colf(whom + ": ", col))
+    return check_for_clipboard(message)
+
+def check_for_clipboard(prompt):
+    '''Replace {clipboard} or {clip} with the contents of the clipboard'''
+    if prompt == "clip":
+        prompt = pyperclip.paste()
+    else:
+        for word in ["{clipboard}", "{clip}"]:
+            if word in prompt:
+                prompt = prompt.replace(word, pyperclip.paste())
+        # Pastes the clipboard in a "code block" (triple backticks)
+        if "{cn}" in prompt:
+            prompt = prompt.replace("{cn}", f"\n\n'''\n{pyperclip.paste()}\n'''")
+    return prompt
+
 # ~~~~~~~~~~~~~~~~~~~~~~~ MAIN ~~~~~~~~~~~~~~~~~~~~~~~#
 def main():
     """Main function."""
     # ask for a system message
-    system_msg = input("System message: ")
+    system_msg = get_prompt("System message", sc)
 
-    # create a new conversation
-    C = Conversation(system_msg)
+    while True:
+        # create a new conversation
+        C = Conversation(system_msg)
+        print(colf(f"Conversation started at {get_time()}", sc))
+        
+        try:
+            # loop until the conversation is over
+            while True:
+                # Ask for a message and add it to the conversation
+                message = get_prompt()
+                C.messages.append({"role": "user", "content": message})
 
-    try:
-        print(colf(f"Conversation started at {get_time()}", mc))
+                # stream the response
+                print(colf("Bot: ", mc), end='')
+                response = C.stream_response()
 
-        # loop until the conversation is over
-        while True:
-            # Ask for a message and add it to the conversation
-            message = input(colf("You: ", mc))
-            C.messages.append({"role": "user", "content": message})
+                if not C.continuing:
+                    break
 
-            # stream the response
-            print(colf("Bot: ", mc), end='')
-            response = C.stream_response()
+        except Exception as e:
+            print(e)
 
-            if not C.continuing:
-                break
-
-    except Exception as e:
-        print(e)
-
-        # Print the line the error occurs on 
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
-    except KeyboardInterrupt:
-        sys.exit()
+            # Print the line the error occurs on 
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+        except KeyboardInterrupt:
+            sys.exit()
 
 if __name__ == "__main__":
     main()
