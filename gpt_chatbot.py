@@ -42,6 +42,82 @@ class Conversation:
 
         # set the token count to 0
         self.token_count = 0
+
+    ## PROPERTY GETTERS
+    @property
+    def continuing(self):
+        """Get whether the conversation is continuing."""
+        return self._continuing
+    
+    @property
+    def model(self):
+        """Get the model."""
+        return self._model
+    
+    @property
+    def max_tokens(self):
+        """Get the max tokens ceiling."""
+        return self._max_tokens
+    
+    @property
+    def temperature(self):
+        """Get the temperature."""
+        return self._temperature
+        
+    ## SETTERS
+    @continuing.setter
+    def continuing(self, continuing):
+        """Set whether the conversation is continuing."""
+        #check if continuing can be converted to a boolean
+        try:
+            # if it can, set it
+            continuing = bool(continuing)
+            self._continuing = continuing
+        except:
+            # if it can't, print a warning
+            print(colf(f"Warning: continuing must be either True or False (1 or 0). The previous value of {self._continuing} was unchanged", wc))
+    
+    @model.setter
+    def model(self, model):
+        """Set the model."""
+        if model in ["gpt-4", "gpt-3.5-turbo"]:
+            self._model = model
+        else:
+            print(colf(f"Warning: model must be either 'gpt-4' or 'gpt-3.5-turbo'. The previous value of {self._model} was unchanged", wc))
+    
+    @max_tokens.setter
+    def max_tokens(self, max_tokens):
+        """Set the max tokens ceiling."""
+        # check if max_tokens can be converted to an integer
+        try:
+            # if it can, set it
+            max_tokens = int(max_tokens)
+            self._max_tokens = max_tokens
+        except:
+            try:
+                # if it can't, try to convert it to a float
+                max_tokens = float(max_tokens)
+                # if it can, round it and print a warning
+                self._max_tokens = round(max_tokens)
+                print(colf(f"Warning: max_tokens must be an integer. The value was rounded to {self._max_tokens}", wc))
+            except:
+                print(colf(f"Warning: max_tokens must be an integer. The previous value of {self._max_tokens} was unchanged", wc))
+    
+    @temperature.setter
+    def temperature(self, temperature):
+        """Set the temperature."""
+        # check if temperature can be converted to a float
+        try:
+            temperature = float(temperature)
+            # if it's between 0 and 1, set it
+            if 0 <= temperature <= 1:
+                self._temperature = temperature
+            # if it's not between 0 and 1, print a warning and set it to either 0 or 1
+            else:
+                self._temperature = 0 if temperature < 0 else 1
+                print(colf(f"Warning: temperature was set to {temperature} but must be between 0 and 1. It was set to {self._temperature}.", wc))
+        except:
+            print(colf(f"Warning: temperature must be a number. The previous value of {self._temperature} was unchanged", wc))
     
     def get_response(self):
         """Get a response from the GPT engine."""
@@ -84,6 +160,53 @@ class Conversation:
         self.token_count += len(enc.encode(self.messages[-1]["content"]))
 
         return response_text
+    
+    def handle_command(self, prompt):
+        """Handles a command prompted by the user
+           valid commands include:
+           :temperarure [float] - sets the temperature
+           :max_tokens [int] - sets the max tokens ceiling
+           :model [model] - sets the model
+           :continue - toggles continuing
+           :help - shows help
+           :quit, :exit, :stop, :end - quits the program"""
+        
+        # get the command
+        command = prompt.split(" ")[0][1:].lower()
+        # get the argument
+        if len(prompt.split(" ")) > 1:
+            argument = prompt.split(" ")[1]
+        
+        # handle the command
+        if command in ["temperature", "temp", "t"]:
+            self.temperature = argument
+            print(colf(f"Temperature set to {self.temperature}.\n", mc))
+        elif command == "max_tokens":
+            self.max_tokens = argument
+            print(colf(f"Max tokens set to {self.max_tokens}.\n", mc))
+        elif command in ["model", "m", "mod"]:
+            self.model = argument
+            print(colf(f"Model set to {self.model}.\n", mc))
+        elif command == "continue":
+            self.continuing = not self.continuing
+            print(colf(f"Continuing set to {self.continuing}.\n", mc))
+        elif command == "help":
+            self.show_help()
+        elif command in ["q", "quit", "exit", "stop", "end"]:
+            quit()
+        else:
+            print(colf(f"{command} is not a valid command. Type :help for help.\n", mc))
+
+    def show_help(self):
+        """Show help."""
+        print(colf("""
+        temperature [float] - sets the temperature
+        :max_tokens [int] - sets the max tokens ceiling
+        :model [model] - sets the model
+        :continue - toggles continuing
+        :help - shows help
+        :quit, :exit, :stop, :end - quits the program
+        """, mc))
     
 # ~~~~~~~~~~~~~~~~~~~~~~~ FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~#
 def get_time(type = "text"):
@@ -133,13 +256,20 @@ def main():
             while True:
                 # Ask for a message and add it to the conversation
                 message = get_prompt()
+                if message[0] == ":":
+                    C.handle_command(message)
+                    continue
+                
                 C.messages.append({"role": "user", "content": message})
 
                 # stream the response
                 print(colf("Bot: ", mc), end='')
                 response = C.stream_response()
 
-                if not C.continuing:
+                if C.continuing:
+                    # if the conversation is continuing, add the response to the conversation
+                    C.messages.append({"role": "system", "content": response})
+                else:
                     break
 
         except Exception as e:
