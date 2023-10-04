@@ -29,7 +29,8 @@ class Conversation:
     
     def __init__(self, system_msg) -> None:
         # set the conversation file based on the time the conversation started
-        self.convo_file = f"{convo_path}/{get_time('file')}"
+        self.time       = time.localtime()
+        self.convo_file = f"{convo_path}/{get_time('file', self.time)}"
 
         # set default settings
         self.continuing = True
@@ -177,27 +178,42 @@ class Conversation:
         if len(prompt.split(" ")) > 1:
             argument = prompt.split(" ")[1]
         
+        end = False
+        new = False
+        msg = None
+
         # handle the command
         if command in ["temperature", "temp", "t"]:
             self.temperature = argument
-            print(colf(f"Temperature set to {self.temperature}.\n", mc))
+            msg = f"Temperature set to {self.temperature}.\n"
         elif command == "max_tokens":
             self.max_tokens = argument
-            print(colf(f"Max tokens set to {self.max_tokens}.\n", mc))
+            msg = f"Max tokens set to {self.max_tokens}.\n"
         elif command in ["model", "m", "mod"]:
             self.model = argument
-            print(colf(f"Model set to {self.model}.\n", mc))
+            msg = f"Model set to {self.model}.\n"
         elif command == "continue":
             self.continuing = not self.continuing
-            print(colf(f"Continuing set to {self.continuing}.\n", mc))
-        elif command == "help":
-            self.show_help()
+            msg = f"Continuing set to {self.continuing}.\n"
         elif command in ["q", "quit", "exit", "stop", "end"]:
-            quit()
+            msg = f"Conversation ended at {get_time()}\n"
+            end = True
         elif command in ["n", "new"]:
-            main()
+            msg = f"Conversation ended at {get_time()}\n"
+            new = True
         else:
-            print(colf(f"{command} is not a valid command. Type :help for help.\n", mc))
+            self.show_help()
+        
+        # if the message exists (i.re. everything but help) print the message and write it to message to the conversation file
+        if msg:
+            print(colf(msg, mc))
+            with open(self.convo_file, "a") as f:
+                f.write(f"{get_time()}\n{msg}\n")
+        # if the command was to end or start a new conversation, do so
+        if new:
+            main()
+        if end:
+            sys.exit()  
 
     def show_help(self):
         """Show help."""
@@ -211,12 +227,12 @@ class Conversation:
         """, mc))
     
 # ~~~~~~~~~~~~~~~~~~~~~~~ FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~#
-def get_time(type = "text"):
+def get_time(type = "text", t = time.localtime()):
     '''Get the current time in the format "dd/mm/yyyy hh:mm:ss" for text or "yyyymmdd_hhmmss" for file names.'''
     if type == "text":
-        return time.strftime("%d/%m/%Y %H:%M:%S", time.localtime())
+        return time.strftime("%d/%m/%Y %H:%M:%S", t)
     elif type == "file":
-        return time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        return time.strftime("%Y%m%d_%H%M%S", t)
     else:
         raise ValueError("type must be either 'text' or 'file'")
 
@@ -251,7 +267,11 @@ def main():
     while True:
         # create a new conversation
         C = Conversation(system_msg)
-        print(colf(f"Conversation started at {get_time()}", sc))
+        print(colf(f"Conversation started at {get_time(t = C.time)}", sc))
+
+        # create file to save conversation to
+        with open(C.convo_file, "w") as f:
+            f.write(f"{get_time(t = C.time)}\nSystem: {system_msg}\n\n")
         
         try:
             # loop until the conversation is over
@@ -263,10 +283,19 @@ def main():
                     continue
                 
                 C.messages.append({"role": "user", "content": message})
+                # write the prompt to the conversation file
+                with open(C.convo_file, "a") as f:
+                    f.write(f"{get_time()}\nYou: {message}\n")
 
                 # stream the response
                 print(colf("Bot: ", mc), end='')
                 response = C.stream_response()
+                # write the response to the conversation file
+                with open(C.convo_file, "a") as f:
+                    f.write(f"{get_time()}\nBot: {response}\n\n")
+
+                # copy the response to the clipboard
+                pyperclip.copy(response)
 
                 # print the max token left
                 print(colf(f"{max(C.max_tokens - C.token_count, 0)} tokens left\n", mc))
