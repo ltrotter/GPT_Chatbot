@@ -194,6 +194,8 @@ class Conversation:
             self.show_help()
         elif command in ["q", "quit", "exit", "stop", "end"]:
             quit()
+        elif command in ["n", "new"]:
+            main()
         else:
             print(colf(f"{command} is not a valid command. Type :help for help.\n", mc))
 
