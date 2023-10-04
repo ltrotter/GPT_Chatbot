@@ -11,7 +11,7 @@ import pyperclip
 # set API keys
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# set names of files to save conversations and token counts and costs to
+# set names of files to save conversations to
 convo_path = "conversations"
 if not os.path.exists(convo_path):
     os.makedirs(convo_path)
@@ -32,7 +32,7 @@ class Conversation:
         self.convo_file = f"{convo_path}/{get_time('file')}"
 
         # set default settings
-        self.continuing = False
+        self.continuing = True
         self.model = "gpt-3.5-turbo" # gpt-4
         self.max_tokens = 1000
         self.temperature = .5
@@ -157,7 +157,7 @@ class Conversation:
         # update token count
         enc = tiktoken.encoding_for_model(self.model)
         self.token_count += len(enc.encode(response_text))
-        self.token_count += len(enc.encode(self.messages[-1]["content"]))
+        self.token_count += len(enc.encode(str(self.messages)))
 
         return response_text
     
@@ -266,11 +266,14 @@ def main():
                 print(colf("Bot: ", mc), end='')
                 response = C.stream_response()
 
-                if C.continuing:
+                # print the max token left
+                print(colf(f"{max(C.max_tokens - C.token_count, 0)} tokens left\n", mc))
+
+                if C.max_tokens <= C.token_count or not C.continuing:
+                    break
+                else:
                     # if the conversation is continuing, add the response to the conversation
                     C.messages.append({"role": "system", "content": response})
-                else:
-                    break
 
         except Exception as e:
             print(e)
